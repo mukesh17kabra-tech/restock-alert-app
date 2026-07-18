@@ -1,10 +1,6 @@
 # Shopify app configuration — used by the Shopify CLI (`shopify app dev`,
 # `shopify app deploy`) if you manage this app with the CLI instead of (or
 # alongside) the Partner Dashboard UI.
-#
-# Replace the placeholder values below with your real app's details from
-# https://partners.shopify.com — most of them are shown on your app's
-# "Overview" and "App setup" pages.
 
 name = "Waitlyst"
 client_id = "39e48daa1467bbda36709e1f72b0ac3f"
@@ -39,18 +35,16 @@ api_version = "2024-10"
   # topics = ["app_subscriptions/update"]
   # uri = "/api/webhooks/subscription-update"
 
-[app_proxy]
-# Optional: lets you serve widget.js and /api/subscribe through the
-# merchant's own domain (e.g. your-store.com/apps/restock-alert/...)
-# instead of your Vercel domain. Not required — the widget works fine
-# calling your Vercel domain directly via CORS. Uncomment and fill in
-# if you want the app-proxy setup instead.
-# url = "https://restock-alert-app.vercel.app/api/proxy"
-# subpath = "restock-alert"
-# prefix = "apps"
+# NOTE: app_proxy section removed entirely. The Shopify CLI treats an
+# [app_proxy] header as "this feature is configured" even if its fields
+# are commented out, and then requires url/subpath/prefix to be present.
+# Since this app doesn't use an app proxy (the widget calls the Vercel
+# domain directly via CORS), the whole section is simply omitted. If you
+# ever want app-proxy routing, add the section back with all three fields
+# filled in — never with just the header and no values.
 
 [pos]
-embedded = false
+embedded = true
 
 [build]
 automatically_update_urls_on_dev = true
