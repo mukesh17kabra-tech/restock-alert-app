@@ -11,7 +11,11 @@ embedded = true
 # Matches the scopes requested in lib/shopify.ts getInstallUrl()
 # read_locations is required alongside read_inventory for the
 # inventory_levels/update webhook topic to validate.
-scopes = "read_products,read_inventory,read_locations,write_webhooks"
+# Note: "write_webhooks" is not a valid Shopify scope — registering
+# webhooks via the Admin API doesn't require a dedicated scope, and the
+# declarative [[webhooks.subscriptions]] below handles registration
+# automatically on deploy, so no webhook-related scope is needed at all.
+scopes = "read_products,read_inventory,read_locations"
 
 [auth]
 redirect_urls = [
