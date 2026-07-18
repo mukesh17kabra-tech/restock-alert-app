@@ -8,7 +8,7 @@
 
 name = "Waitlyst"
 client_id = "39e48daa1467bbda36709e1f72b0ac3f"
-application_url = "https://your-app.vercel.app"
+application_url = "https://restock-alert-app.vercel.app"
 embedded = true
 
 [access_scopes]
@@ -17,7 +17,7 @@ scopes = "read_products,read_inventory,write_webhooks"
 
 [auth]
 redirect_urls = [
-  "https://your-app.vercel.app/api/auth/callback"
+  "https://restock-alert-app.vercel.app/api/auth/callback"
 ]
 
 [webhooks]
@@ -43,7 +43,7 @@ api_version = "2024-10"
 # instead of your Vercel domain. Not required — the widget works fine
 # calling your Vercel domain directly via CORS. Uncomment and fill in
 # if you want the app-proxy setup instead.
-# url = "https://your-app.vercel.app/api/proxy"
+# url = "https://restock-alert-app.vercel.app/api/proxy"
 # subpath = "restock-alert"
 # prefix = "apps"
 
