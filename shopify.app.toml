@@ -1,0 +1,55 @@
+# Shopify app configuration — used by the Shopify CLI (`shopify app dev`,
+# `shopify app deploy`) if you manage this app with the CLI instead of (or
+# alongside) the Partner Dashboard UI.
+#
+# Replace the placeholder values below with your real app's details from
+# https://partners.shopify.com — most of them are shown on your app's
+# "Overview" and "App setup" pages.
+
+name = "Waitlyst"
+client_id = "39e48daa1467bbda36709e1f72b0ac3f"
+application_url = "https://your-app.vercel.app"
+embedded = true
+
+[access_scopes]
+# Matches the scopes requested in lib/shopify.ts getInstallUrl()
+scopes = "read_products,read_inventory,write_webhooks"
+
+[auth]
+redirect_urls = [
+  "https://your-app.vercel.app/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2024-10"
+
+  [[webhooks.subscriptions]]
+  topics = ["inventory_levels/update"]
+  uri = "/api/webhooks/inventory"
+
+  # Recommended additions (see README "Next steps to make this
+  # production-ready") — uncomment once you build these handlers:
+  # [[webhooks.subscriptions]]
+  # topics = ["app/uninstalled"]
+  # uri = "/api/webhooks/uninstalled"
+  #
+  # [[webhooks.subscriptions]]
+  # topics = ["app_subscriptions/update"]
+  # uri = "/api/webhooks/subscription-update"
+
+[app_proxy]
+# Optional: lets you serve widget.js and /api/subscribe through the
+# merchant's own domain (e.g. your-store.com/apps/restock-alert/...)
+# instead of your Vercel domain. Not required — the widget works fine
+# calling your Vercel domain directly via CORS. Uncomment and fill in
+# if you want the app-proxy setup instead.
+# url = "https://your-app.vercel.app/api/proxy"
+# subpath = "restock-alert"
+# prefix = "apps"
+
+[pos]
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true

@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// One row per Shopify store that installs the app
+model Shop {
+  id          String   @id @default(cuid())
+  shopDomain  String   @unique // e.g. my-store.myshopify.com
+  accessToken String
+  plan        String   @default("free") // free | pro
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subscribers VariantSubscriber[]
+  webhookLogs WebhookLog[]
+}
+
+// A customer waiting on a specific out-of-stock variant
+model VariantSubscriber {
+  id          String    @id @default(cuid())
+  shopId      String
+  shop        Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  productId   String    // Shopify product GID
+  variantId   String    // Shopify variant GID
+  productTitle String
+  variantTitle String
+  email       String
+
+  notified    Boolean   @default(false)
+  notifiedAt  DateTime?
+  reminderSent Boolean  @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@unique([shopId, variantId, email]) // no duplicate signups
+  @@index([shopId, variantId])
+}
+
+// Raw log of inventory webhooks received, for debugging/audit
+model WebhookLog {
+  id        String   @id @default(cuid())
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  topic     String
+  payload   Json
+  createdAt DateTime @default(now())
+}
