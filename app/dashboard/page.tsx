@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import type { VariantSubscriber } from "@prisma/client";
 
 export default async function Dashboard({
   searchParams,
@@ -67,7 +68,7 @@ export default async function Dashboard({
                   </tr>
                 </thead>
                 <tbody>
-                  {pending.map((sub) => (
+                  {pending.map((sub: VariantSubscriber) => (
                     <tr key={sub.id} className="border-t border-white/5">
                       <td className="px-4 py-3">{sub.productTitle}</td>
                       <td className="px-4 py-3 text-white/60">{sub.variantTitle}</td>
