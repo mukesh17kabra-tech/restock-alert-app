@@ -1,16 +1,32 @@
 import { redirect } from "next/navigation";
 
+// Shopify's `host` param is base64 of "<shop>.myshopify.com/admin" (or
+// similar). When Shopify opens an embedded app from the Admin sidebar it
+// doesn't always include a plain `shop` param — often just `host` — so we
+// decode it to recover the shop domain.
+function shopFromHost(host: string): string | null {
+  try {
+    const decoded = Buffer.from(host, "base64").toString("utf-8");
+    // decoded looks like "my-store.myshopify.com/admin"
+    const match = decoded.match(/^([a-zA-Z0-9-]+\.myshopify\.com)/);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
+
 // This is the App URL Shopify opens when a merchant clicks the app in
-// their Admin sidebar. Shopify always calls it with ?shop=... (and
-// usually &host=...) query params. If those are present, we're being
-// opened from inside Shopify Admin, so send the merchant straight to
-// the dashboard instead of showing this plain instructional page.
+// their Admin sidebar. If we can determine the shop (from `shop` or by
+// decoding `host`), send the merchant straight to the dashboard instead
+// of showing this plain instructional page.
 export default async function Home({
   searchParams,
 }: {
   searchParams: Promise<{ shop?: string; host?: string }>;
 }) {
-  const { shop, host } = await searchParams;
+  const { shop: shopParam, host } = await searchParams;
+
+  const shop = shopParam || (host ? shopFromHost(host) : null);
 
   if (shop) {
     const params = new URLSearchParams({ shop });
@@ -19,7 +35,7 @@ export default async function Home({
   }
 
   // Only shown if someone opens the bare Vercel URL directly with no
-  // shop param — e.g. you, testing, not a merchant inside Shopify Admin.
+  // shop/host param — e.g. you, testing, not a merchant inside Shopify Admin.
   return (
     <main className="min-h-screen bg-[#0B0D0F] text-[#E7E9EA] flex items-center justify-center">
       <div className="max-w-md text-center px-6">

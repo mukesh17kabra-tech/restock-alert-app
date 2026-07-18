@@ -1,12 +1,25 @@
 import { db } from "@/lib/db";
 import type { VariantSubscriber } from "@prisma/client";
 
+// Same fallback as app/page.tsx — Shopify doesn't always pass a plain
+// `shop` param, sometimes just `host` (base64 of the shop's admin URL).
+function shopFromHost(host: string): string | null {
+  try {
+    const decoded = Buffer.from(host, "base64").toString("utf-8");
+    const match = decoded.match(/^([a-zA-Z0-9-]+\.myshopify\.com)/);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function Dashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ shop?: string }>;
+  searchParams: Promise<{ shop?: string; host?: string }>;
 }) {
-  const { shop } = await searchParams;
+  const { shop: shopParam, host } = await searchParams;
+  const shop = shopParam || (host ? shopFromHost(host) : null);
 
   if (!shop) {
     return <div className="p-8 text-sm text-gray-500">Missing shop parameter.</div>;
