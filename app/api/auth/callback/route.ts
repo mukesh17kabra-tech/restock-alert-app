@@ -25,6 +25,11 @@ export async function GET(req: NextRequest) {
 
   await registerInventoryWebhook(shop, access_token);
 
-  // Send merchant into the embedded app dashboard
-  return NextResponse.redirect(`${process.env.HOST}/dashboard?shop=${shop}`);
+  // Send merchant into the embedded app dashboard, preserving the `host`
+  // param if Shopify gave us one (needed for embedded App Bridge context).
+  const host = req.nextUrl.searchParams.get("host");
+  const params = new URLSearchParams({ shop });
+  if (host) params.set("host", host);
+
+  return NextResponse.redirect(`${process.env.HOST}/dashboard?${params.toString()}`);
 }
