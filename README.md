@@ -28,7 +28,9 @@ deployed on Vercel.
 2. App URL: `https://your-app.vercel.app`
 3. Allowed redirection URL: `https://your-app.vercel.app/api/auth/callback`
 4. Copy the API key/secret into `SHOPIFY_API_KEY` / `SHOPIFY_API_SECRET`
-5. Required scopes: `read_products,read_inventory,write_webhooks`
+5. Required scopes: `read_products,read_inventory,read_locations,write_webhooks`
+   (`read_locations` is required alongside `read_inventory` for the
+   `inventory_levels/update` webhook to validate)
 
 A `shopify.app.toml` is included in this repo if you'd rather manage the app
 via the Shopify CLI (`shopify app dev` / `shopify app deploy`) instead of

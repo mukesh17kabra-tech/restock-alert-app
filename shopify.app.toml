@@ -13,7 +13,9 @@ embedded = true
 
 [access_scopes]
 # Matches the scopes requested in lib/shopify.ts getInstallUrl()
-scopes = "read_products,read_inventory,write_webhooks"
+# read_locations is required alongside read_inventory for the
+# inventory_levels/update webhook topic to validate.
+scopes = "read_products,read_inventory,read_locations,write_webhooks"
 
 [auth]
 redirect_urls = [
@@ -48,7 +50,7 @@ api_version = "2024-10"
 # prefix = "apps"
 
 [pos]
-embedded = true
+embedded = false
 
 [build]
 automatically_update_urls_on_dev = true

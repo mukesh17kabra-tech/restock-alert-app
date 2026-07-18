@@ -1,7 +1,7 @@
 const API_VERSION = "2024-10";
 
 export function getInstallUrl(shop: string, state: string) {
-  const scopes = "read_products,read_inventory,write_webhooks";
+  const scopes = "read_products,read_inventory,read_locations,write_webhooks";
   const redirectUri = `${process.env.HOST}/api/auth/callback`;
   const clientId = process.env.SHOPIFY_API_KEY;
   return (
