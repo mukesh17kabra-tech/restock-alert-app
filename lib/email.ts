@@ -1,6 +1,20 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazily construct the client on first use, inside a request, instead of at
+// module load time. Next.js evaluates route modules during the build's
+// "collecting page data" step — if RESEND_API_KEY isn't available yet at
+// that point (or the constructor runs before env is injected), building
+// eagerly here throws and fails the whole build.
+let _resend: Resend | null = null;
+function getResend() {
+  if (!_resend) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY is not set — add it in Vercel's env vars.");
+    }
+    _resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return _resend;
+}
 
 export async function sendRestockEmail(params: {
   to: string;
@@ -10,7 +24,7 @@ export async function sendRestockEmail(params: {
 }) {
   const { to, productTitle, variantTitle, productUrl } = params;
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: process.env.EMAIL_FROM || "alerts@yourapp.com",
     to,
     subject: `Back in stock: ${productTitle}`,
@@ -39,7 +53,7 @@ export async function sendReminderEmail(params: {
 }) {
   const { to, productTitle, variantTitle, productUrl } = params;
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from: process.env.EMAIL_FROM || "alerts@yourapp.com",
     to,
     subject: `Still available: ${productTitle}`,
