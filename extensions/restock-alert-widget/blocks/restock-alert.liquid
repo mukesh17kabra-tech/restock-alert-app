@@ -1,0 +1,37 @@
+{% comment %}
+  Restock Alert app block. Merchants add this from the theme editor
+  (Customize → Product page → Add block → Apps → Restock Alert) — no code
+  editing required. Only renders the "notify me" form when the currently
+  selected/first-available variant is out of stock.
+{% endcomment %}
+
+{% unless product.selected_or_first_available_variant.available %}
+  <div
+    id="restock-alert-widget-{{ block.id }}"
+    class="restock-alert-widget"
+    data-shop="{{ shop.permanent_domain }}"
+    data-product-id="{{ product.id }}"
+    data-variant-id="{{ product.selected_or_first_available_variant.id }}"
+    data-product-title="{{ product.title | escape }}"
+    data-variant-title="{{ product.selected_or_first_available_variant.title | escape }}"
+    data-api-base="{{ block.settings.api_base }}"
+    {{ block.shopify_attributes }}
+  ></div>
+  <script src="{{ 'restock-alert-widget.js' | asset_url }}" defer></script>
+{% endunless %}
+
+{% schema %}
+{
+  "name": "Restock Alert",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "api_base",
+      "label": "App URL",
+      "default": "https://restock-alert-app.vercel.app",
+      "info": "Leave as-is unless instructed otherwise by the app developer."
+    }
+  ]
+}
+{% endschema %}

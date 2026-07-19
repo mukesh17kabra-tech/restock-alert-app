@@ -80,9 +80,30 @@ https://your-app.vercel.app/api/auth?shop=your-test-store.myshopify.com
 This starts OAuth, stores the access token in Neon, and registers the
 inventory webhook automatically.
 
-## 7. Add the widget to your product template
+## 7. Deploy the Theme App Extension (recommended way merchants add the widget)
 
-In your theme's product template (or via a Theme App Extension block):
+This repo includes a Theme App Extension at
+`extensions/restock-alert-widget/` — a drag-and-drop block merchants add
+from the theme editor (Online Store → Themes → Customize → Add block →
+Apps → Restock Alert). No code editing required on their end.
+
+Deploy it along with your app config:
+```bash
+shopify app deploy
+```
+This is the **only supported way** to have your app write into a
+merchant's theme. Shopify's older approach — writing theme files directly
+via API (REST Assets or the GraphQL `themeFilesUpsert` mutation) — is
+locked behind a manual exemption Shopify grants only to a small set of
+theme-customization apps; regular apps get an `ACCESS_DENIED` error even
+with `write_themes` granted. Don't build around that API — use a Theme
+App Extension instead, as this repo already does.
+
+### Manual snippet (fallback for legacy/vintage themes only)
+
+If a merchant's theme predates Online Store 2.0 and doesn't support app
+blocks, they can paste this into a Custom Liquid block on their product
+template instead:
 
 ```liquid
 <div id="restock-alert-widget"
@@ -97,6 +118,9 @@ In your theme's product template (or via a Theme App Extension block):
 
 Show it only when the variant is sold out — wrap it in
 `{% unless product.selected_or_first_available_variant.available %} ... {% endunless %}`.
+
+The in-app "Widget setup" tab (`/dashboard/widget-setup`) shows both
+options to the merchant directly, recommending the app block first.
 
 ## Important note on the inventory webhook
 
