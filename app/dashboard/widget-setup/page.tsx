@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { resolveShop } from "@/lib/shop-context";
 import { NavBar } from "@/components/NavBar";
 import { CopySnippet } from "@/components/CopySnippet";
+import { AutoInstallButton } from "@/components/AutoInstallButton";
 
 export default async function WidgetSetupPage({
   searchParams,
@@ -41,6 +42,18 @@ export default async function WidgetSetupPage({
         <NavBar shop={shop} host={host} active="widget-setup" />
 
         <section className="max-w-2xl space-y-8">
+          <AutoInstallButton shop={shop} />
+
+          <div className="border-t border-white/10 pt-8">
+            <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-white/50">
+              Prefer to add it manually? (advanced)
+            </h2>
+            <p className="mb-4 text-sm text-white/60 leading-relaxed">
+              If you use a custom theme or the automatic install above didn&apos;t find your
+              product template, follow these steps instead.
+            </p>
+          </div>
+
           <div>
             <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-white/50">
               1. Add the widget to your product template

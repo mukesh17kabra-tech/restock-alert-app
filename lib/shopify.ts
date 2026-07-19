@@ -1,7 +1,7 @@
 const API_VERSION = "2024-10";
 
 export function getInstallUrl(shop: string, state: string) {
-  const scopes = "read_products,read_inventory,read_locations";
+  const scopes = "read_products,read_inventory,read_locations,write_themes";
   const redirectUri = `${process.env.HOST}/api/auth/callback`;
   const clientId = process.env.SHOPIFY_API_KEY;
   return (
@@ -55,4 +55,54 @@ export async function getVariant(shop: string, accessToken: string, variantId: s
   if (!res.ok) return null;
   const data = await res.json();
   return data.variant;
+}
+
+// ---- Theme Asset API helpers (used by the "auto-install widget" button) ----
+
+// Finds the merchant's currently active (published) theme.
+export async function getMainThemeId(shop: string, accessToken: string) {
+  const res = await fetch(`https://${shop}/admin/api/${API_VERSION}/themes.json`, {
+    headers: { "X-Shopify-Access-Token": accessToken },
+  });
+  if (!res.ok) throw new Error(`Failed to list themes: ${res.status}`);
+  const data = await res.json();
+  const mainTheme = data.themes.find((t: { role: string }) => t.role === "main");
+  if (!mainTheme) throw new Error("No main (published) theme found");
+  return mainTheme.id as number;
+}
+
+export async function getAsset(
+  shop: string,
+  accessToken: string,
+  themeId: number,
+  key: string
+): Promise<string | null> {
+  const res = await fetch(
+    `https://${shop}/admin/api/${API_VERSION}/themes/${themeId}/assets.json?asset[key]=${encodeURIComponent(key)}`,
+    { headers: { "X-Shopify-Access-Token": accessToken } }
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.asset?.value ?? null;
+}
+
+export async function putAsset(
+  shop: string,
+  accessToken: string,
+  themeId: number,
+  key: string,
+  value: string
+) {
+  const res = await fetch(`https://${shop}/admin/api/${API_VERSION}/themes/${themeId}/assets.json`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Shopify-Access-Token": accessToken,
+    },
+    body: JSON.stringify({ asset: { key, value } }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to write asset ${key}: ${res.status} ${await res.text()}`);
+  }
+  return res.json();
 }
