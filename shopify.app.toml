@@ -52,3 +52,4 @@ embedded = true
 
 [build]
 automatically_update_urls_on_dev = true
+include_config_on_deploy = true

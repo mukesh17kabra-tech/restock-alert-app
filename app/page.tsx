@@ -1,19 +1,5 @@
 import { redirect } from "next/navigation";
-
-// Shopify's `host` param is base64 of "<shop>.myshopify.com/admin" (or
-// similar). When Shopify opens an embedded app from the Admin sidebar it
-// doesn't always include a plain `shop` param — often just `host` — so we
-// decode it to recover the shop domain.
-function shopFromHost(host: string): string | null {
-  try {
-    const decoded = Buffer.from(host, "base64").toString("utf-8");
-    // decoded looks like "my-store.myshopify.com/admin"
-    const match = decoded.match(/^([a-zA-Z0-9-]+\.myshopify\.com)/);
-    return match ? match[1] : null;
-  } catch {
-    return null;
-  }
-}
+import { resolveShop } from "@/lib/shop-context";
 
 // This is the App URL Shopify opens when a merchant clicks the app in
 // their Admin sidebar. If we can determine the shop (from `shop` or by
@@ -25,8 +11,7 @@ export default async function Home({
   searchParams: Promise<{ shop?: string; host?: string }>;
 }) {
   const { shop: shopParam, host } = await searchParams;
-
-  const shop = shopParam || (host ? shopFromHost(host) : null);
+  const shop = resolveShop(shopParam, host);
 
   if (shop) {
     const params = new URLSearchParams({ shop });
