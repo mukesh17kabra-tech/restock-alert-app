@@ -15,7 +15,7 @@ embedded = true
 # webhooks via the Admin API doesn't require a dedicated scope, and the
 # declarative [[webhooks.subscriptions]] below handles registration
 # automatically on deploy, so no webhook-related scope is needed at all.
-scopes = "read_products,read_inventory,read_locations,write_themes"
+scopes = "read_products,read_inventory,read_locations,read_themes,write_themes"
 
 [auth]
 redirect_urls = [

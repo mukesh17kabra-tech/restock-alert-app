@@ -28,12 +28,13 @@ deployed on Vercel.
 2. App URL: `https://your-app.vercel.app`
 3. Allowed redirection URL: `https://your-app.vercel.app/api/auth/callback`
 4. Copy the API key/secret into `SHOPIFY_API_KEY` / `SHOPIFY_API_SECRET`
-5. Required scopes: `read_products,read_inventory,read_locations,write_themes`
+5. Required scopes: `read_products,read_inventory,read_locations,read_themes,write_themes`
    (`read_locations` is required alongside `read_inventory` for the
-   `inventory_levels/update` webhook to validate. `write_themes` is
-   required for the one-click "auto-install widget" button, which edits
-   the merchant's theme files directly via the Asset API. Note:
-   registering webhooks via the Admin API doesn't need its own scope —
+   `inventory_levels/update` webhook to validate. `read_themes`/`write_themes`
+   are required for the one-click "auto-install widget" button, which reads
+   and edits the merchant's theme files via the Asset API — both scopes are
+   needed even though `write_themes` sounds like it should cover reading too.
+   Note: registering webhooks via the Admin API doesn't need its own scope —
    there's no such thing as a `write_webhooks` scope, despite how it sounds.)
 
 A `shopify.app.toml` is included in this repo if you'd rather manage the app
