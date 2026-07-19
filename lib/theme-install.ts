@@ -1,4 +1,4 @@
-import { getMainThemeId, getAsset, putAsset } from "@/lib/shopify";
+import { getMainThemeGid, getThemeFile, putThemeFile } from "@/lib/shopify";
 
 const MARKER_START = "{% comment %} restock-alert-widget:start {% endcomment %}";
 const MARKER_END = "{% comment %} restock-alert-widget:end {% endcomment %}";
@@ -30,7 +30,7 @@ ${MARKER_END}`;
 }
 
 export type InstallResult =
-  | { success: true; themeId: number; file: string }
+  | { success: true; themeId: string; file: string }
   | { success: false; error: string };
 
 export async function autoInstallWidget(
@@ -39,9 +39,9 @@ export async function autoInstallWidget(
 ): Promise<InstallResult> {
   const host = process.env.HOST!;
 
-  let themeId: number;
+  let themeGid: string;
   try {
-    themeId = await getMainThemeId(shop, accessToken);
+    themeGid = await getMainThemeGid(shop, accessToken);
   } catch (err) {
     return { success: false, error: `Couldn't find the active theme: ${(err as Error).message}` };
   }
@@ -49,7 +49,13 @@ export async function autoInstallWidget(
   // 1. Write (or overwrite) the reusable snippet file. Safe to always
   // overwrite — it's our own file, identified by a unique name.
   try {
-    await putAsset(shop, accessToken, themeId, "snippets/restock-alert-widget.liquid", buildSnippetSource(host));
+    await putThemeFile(
+      shop,
+      accessToken,
+      themeGid,
+      "snippets/restock-alert-widget.liquid",
+      buildSnippetSource(host)
+    );
   } catch (err) {
     return { success: false, error: `Couldn't create the widget snippet: ${(err as Error).message}` };
   }
@@ -58,23 +64,28 @@ export async function autoInstallWidget(
   // exists, right before its closing tag — unless it's already there
   // (checked via the marker comment, so clicking the button twice is safe).
   for (const file of CANDIDATE_FILES) {
-    const existing = await getAsset(shop, accessToken, themeId, file);
+    let existing: string | null;
+    try {
+      existing = await getThemeFile(shop, accessToken, themeGid, file);
+    } catch (err) {
+      return { success: false, error: `Couldn't read ${file}: ${(err as Error).message}` };
+    }
     if (existing === null) continue; // this theme doesn't have that file
 
     if (existing.includes(MARKER_START)) {
       // Already installed in this file — nothing to do, treat as success.
-      return { success: true, themeId, file };
+      return { success: true, themeId: themeGid, file };
     }
 
     const updated = `${existing}\n${buildInjectionBlock(host)}\n`;
 
     try {
-      await putAsset(shop, accessToken, themeId, file, updated);
+      await putThemeFile(shop, accessToken, themeGid, file, updated);
     } catch (err) {
       return { success: false, error: `Couldn't update ${file}: ${(err as Error).message}` };
     }
 
-    return { success: true, themeId, file };
+    return { success: true, themeId: themeGid, file };
   }
 
   return {

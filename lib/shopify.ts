@@ -57,52 +57,103 @@ export async function getVariant(shop: string, accessToken: string, variantId: s
   return data.variant;
 }
 
-// ---- Theme Asset API helpers (used by the "auto-install widget" button) ----
+// ---- Theme file helpers (used by the "auto-install widget" button) ----
+//
+// Shopify's older REST "Asset" endpoint (themes/{id}/assets.json) is
+// deprecated for apps created after a certain cutoff and returns 404 for
+// them even with correct scopes. The supported replacement is the GraphQL
+// Admin API's theme file query/mutation, so all theme reads/writes below
+// go through GraphQL instead of REST.
 
-// Finds the merchant's currently active (published) theme.
-export async function getMainThemeId(shop: string, accessToken: string) {
-  const res = await fetch(`https://${shop}/admin/api/${API_VERSION}/themes.json`, {
-    headers: { "X-Shopify-Access-Token": accessToken },
-  });
-  if (!res.ok) throw new Error(`Failed to list themes: ${res.status}`);
-  const data = await res.json();
-  const mainTheme = data.themes.find((t: { role: string }) => t.role === "main");
-  if (!mainTheme) throw new Error("No main (published) theme found");
-  return mainTheme.id as number;
-}
-
-export async function getAsset(
-  shop: string,
-  accessToken: string,
-  themeId: number,
-  key: string
-): Promise<string | null> {
-  const res = await fetch(
-    `https://${shop}/admin/api/${API_VERSION}/themes/${themeId}/assets.json?asset[key]=${encodeURIComponent(key)}`,
-    { headers: { "X-Shopify-Access-Token": accessToken } }
-  );
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.asset?.value ?? null;
-}
-
-export async function putAsset(
-  shop: string,
-  accessToken: string,
-  themeId: number,
-  key: string,
-  value: string
-) {
-  const res = await fetch(`https://${shop}/admin/api/${API_VERSION}/themes/${themeId}/assets.json`, {
-    method: "PUT",
+async function shopifyGraphQL(shop: string, accessToken: string, query: string, variables: object) {
+  const res = await fetch(`https://${shop}/admin/api/${API_VERSION}/graphql.json`, {
+    method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Shopify-Access-Token": accessToken,
     },
-    body: JSON.stringify({ asset: { key, value } }),
+    body: JSON.stringify({ query, variables }),
   });
   if (!res.ok) {
-    throw new Error(`Failed to write asset ${key}: ${res.status} ${await res.text()}`);
+    throw new Error(`GraphQL request failed: ${res.status} ${await res.text()}`);
   }
-  return res.json();
+  const json = await res.json();
+  if (json.errors) {
+    throw new Error(`GraphQL errors: ${JSON.stringify(json.errors)}`);
+  }
+  return json.data;
+}
+
+// Finds the merchant's currently active (published) theme and returns its
+// GraphQL GID (e.g. "gid://shopify/OnlineStoreTheme/123").
+export async function getMainThemeGid(shop: string, accessToken: string): Promise<string> {
+  const data = await shopifyGraphQL(
+    shop,
+    accessToken,
+    `query {
+      themes(first: 1, roles: [MAIN]) {
+        nodes { id }
+      }
+    }`,
+    {}
+  );
+  const theme = data?.themes?.nodes?.[0];
+  if (!theme) throw new Error("No main (published) theme found");
+  return theme.id as string;
+}
+
+// Reads a single theme file's text content, or null if it doesn't exist.
+export async function getThemeFile(
+  shop: string,
+  accessToken: string,
+  themeGid: string,
+  filename: string
+): Promise<string | null> {
+  const data = await shopifyGraphQL(
+    shop,
+    accessToken,
+    `query GetFile($id: ID!, $filenames: [String!]!) {
+      theme(id: $id) {
+        files(filenames: $filenames) {
+          nodes {
+            filename
+            body {
+              ... on OnlineStoreThemeFileBodyText { content }
+            }
+          }
+        }
+      }
+    }`,
+    { id: themeGid, filenames: [filename] }
+  );
+  const node = data?.theme?.files?.nodes?.[0];
+  return node?.body?.content ?? null;
+}
+
+// Creates or overwrites a theme file.
+export async function putThemeFile(
+  shop: string,
+  accessToken: string,
+  themeGid: string,
+  filename: string,
+  content: string
+) {
+  const data = await shopifyGraphQL(
+    shop,
+    accessToken,
+    `mutation UpsertFile($themeId: ID!, $files: [OnlineStoreThemeFilesUpsertFileInput!]!) {
+      themeFilesUpsert(themeId: $themeId, files: $files) {
+        userErrors { field message }
+      }
+    }`,
+    {
+      themeId: themeGid,
+      files: [{ filename, body: { type: "TEXT", value: content } }],
+    }
+  );
+  const errors = data?.themeFilesUpsert?.userErrors;
+  if (errors?.length) {
+    throw new Error(`Theme file write rejected: ${JSON.stringify(errors)}`);
+  }
+  return data;
 }

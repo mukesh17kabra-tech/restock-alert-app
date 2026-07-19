@@ -16,5 +16,10 @@ export async function POST(req: NextRequest) {
   }
 
   const result = await autoInstallWidget(shop, shopRecord.accessToken);
+
+  if (!result.success) {
+    console.error(`[install-widget] Failed for ${shop}:`, result.error);
+  }
+
   return NextResponse.json(result, { status: result.success ? 200 : 500 });
 }
