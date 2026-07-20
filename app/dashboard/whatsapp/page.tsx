@@ -25,7 +25,7 @@ export default async function WhatsAppPage({
   const isConnected = shopRecord.whatsappSenderStatus === "online";
   const isPending = !!shopRecord.twilioSenderSid && !isConnected;
   const plan = PLANS[shopRecord.plan as PlanKey] ?? PLANS.free;
-  const whatsappAvailableOnPlan = plan.whatsappMessageCap > 0;
+  const whatsappAvailableOnPlan = plan.whatsappMessageCap > 0 || shopRecord.testModeBypassCaps;
 
   return (
     <main className="min-h-screen bg-[#0B0D0F] text-[#E7E9EA] font-sans">

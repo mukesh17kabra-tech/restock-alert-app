@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   }
 
   const plan = PLANS[shopRecord.plan as PlanKey] ?? PLANS.free;
-  if (plan.subscriberCap !== Infinity) {
+  if (!shopRecord.testModeBypassCaps && plan.subscriberCap !== Infinity) {
     const count = await db.variantSubscriber.count({ where: { shopId: shopRecord.id, notified: false } });
     if (count >= plan.subscriberCap) {
       return withCors(

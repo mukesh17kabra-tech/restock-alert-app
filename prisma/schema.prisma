@@ -39,6 +39,11 @@ model Shop {
   whatsappMessagesThisCycle Int      @default(0)
   currentCycleStartedAt     DateTime @default(now())
 
+  // When true, ignores plan caps (signup cap + WhatsApp cap) for this shop.
+  // For your own testing only — toggle manually in the database, no UI
+  // exposes this to merchants.
+  testModeBypassCaps Boolean @default(false)
+
   subscribers VariantSubscriber[]
   webhookLogs WebhookLog[]
 }

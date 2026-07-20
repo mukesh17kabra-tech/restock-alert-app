@@ -15,6 +15,11 @@
     data-product-title="{{ product.title | escape }}"
     data-variant-title="{{ product.selected_or_first_available_variant.title | escape }}"
     data-api-base="{{ block.settings.api_base }}"
+    {% if customer %}
+      data-customer-name="{{ customer.name | escape }}"
+      data-customer-email="{{ customer.email | escape }}"
+      data-customer-phone="{{ customer.default_address.phone | escape }}"
+    {% endif %}
     {{ block.shopify_attributes }}
   ></div>
   <script src="{{ 'restock-alert-widget.js' | asset_url }}" defer></script>
