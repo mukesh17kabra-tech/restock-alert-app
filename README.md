@@ -138,26 +138,48 @@ The subscribe/webhook code is structured so this is a small, isolated change.
 
 Plan pricing lives in one place: `lib/billing.ts` → `PLANS`.
 
-| Plan | Price | Subscriber cap | Extra perk | Trial |
-|--------|--------|------------------|--------------------------------|-------|
-| Free   | $0     | 50 active signups | —                              | —     |
-| Growth | $7.99/mo | 200 active signups | 48h follow-up reminder email | 7 days |
-| Pro    | $19/mo | Unlimited | 48h follow-up reminder + priority send | 7 days |
+| Plan | Price | Signups | WhatsApp/mo | Extra perk | Trial |
+|----------|----------|------------------|-------------|--------------------------------|-------|
+| Free     | $0       | 50 active signups | 0 (email only) | —                          | —     |
+| Growth   | $8.99/mo | 200 active signups | 250 | 48h follow-up reminder email | 7 days |
+| Pro      | $14.99/mo | Unlimited | 1,000 | 48h follow-up reminder + priority send | 7 days |
+| Business | $24.99/mo | Unlimited | 3,000 + overage | Priority send | 7 days |
 
 - The cap is enforced in `app/api/subscribe/route.ts` — once a shop hits its
   plan's signup cap, new signups get a 402 response telling the storefront
   widget to show an "upgrade needed" state.
-- `app/api/billing/upgrade?shop=...&plan=growth|pro` starts a Shopify
-  `recurring_application_charge` for the chosen plan and redirects the
-  merchant to Shopify's own hosted approval page (you don't build this UI —
-  Shopify shows price, trial, and Accept/Decline).
+- `app/api/billing/upgrade?shop=...&plan=growth|pro|business` starts a
+  Shopify `recurring_application_charge` for the chosen plan and redirects
+  the merchant to Shopify's own hosted approval page (you don't build this
+  UI — Shopify shows price, trial, and Accept/Decline).
 - `app/api/billing/callback` runs after the merchant approves or declines:
-  it activates the charge with Shopify and sets `Shop.plan` to whichever
-  plan was requested. If declined, the shop keeps its previous plan.
+  it activates the charge with Shopify, sets `Shop.plan`, saves the
+  `recurringChargeId` (needed for Business-tier overage billing), and
+  resets the WhatsApp usage counter.
 - The dashboard (`app/dashboard`) shows plan cards with real "Upgrade" links
   for any plan above the shop's current one.
 - Set `SHOPIFY_BILLING_TEST_MODE=true` in your env while testing — Shopify
   will simulate the charge without actually billing (required for dev stores).
+
+### Why WhatsApp has a hard cap on every tier except overage on Business
+
+Every WhatsApp template message costs real money (~$0.005/message via
+Meta). Unlike storage or signups, letting this scale unbounded with a flat
+subscription price means heavier usage costs you more without earning more
+— a losing structure as merchants grow. So:
+- **Free**: WhatsApp is locked entirely (`whatsappMessageCap: 0`) — email only.
+- **Growth/Pro**: hard monthly cap. Once hit, further restock notifications
+  for that shop automatically fall back to email (see
+  `app/api/webhooks/inventory/route.ts` — `canSendWhatsApp` check) instead
+  of failing silently or costing you money beyond what the plan covers.
+- **Business**: no hard stop — sends continue past the 3,000/mo included,
+  and the overage is billed automatically via Shopify's Usage Charge API
+  (`$5` per extra 1,000 messages, rounded up), calculated and charged once
+  a month by `app/api/cron/billing-cycle`.
+- `Shop.whatsappMessagesThisCycle` / `currentCycleStartedAt` track usage
+  per shop; the cron resets these every ~30 days for every shop regardless
+  of plan, and only bills overage for Business-tier shops that exceeded
+  their cap.
 
 ### The 48h reminder (Growth + Pro perk)
 
@@ -187,3 +209,83 @@ read from that single source of truth.
 - Handle the case where a Pro merchant's charge is cancelled/frozen by
   Shopify (e.g. failed payment) — listen for the `app_subscriptions/update`
   webhook and downgrade `Shop.plan` back to `"free"`
+
+## WhatsApp setup (as app owner) — do this once
+
+This uses **Twilio** as the WhatsApp provider — Twilio is itself a
+Meta-verified WhatsApp Tech Provider, so merchants who install your app
+can connect their own WhatsApp number **without creating a Twilio account,
+a Meta Business account, or going through Meta's own (often flaky)
+verification flow.** Everything happens under your one Twilio account,
+through a hosted link Twilio provides — the merchant just clicks it and
+confirms their number.
+
+### 1. Create a Twilio account
+1. Go to https://twilio.com → sign up (free trial, no card needed to start)
+2. From the Console, copy your **Account SID** and **Auth Token**
+   (Console home page, top of the dashboard)
+
+### 2. Set environment variables (Vercel)
+```
+TWILIO_ACCOUNT_SID=<your Account SID>
+TWILIO_AUTH_TOKEN=<your Auth Token>
+```
+
+### 3. Create and approve the restock alert template
+WhatsApp requires every template to be pre-approved once, same as with
+direct Meta — Twilio just makes the submission UI simpler.
+1. Twilio Console → **Messaging → Content Template Builder** → **Create new**
+2. Category: **Utility**
+3. Body text (use `{{1}}`, `{{2}}`, `{{3}}` placeholders — these map to
+   `contentVariables` in `lib/twilio.ts` in order: name, product, link):
+   ```
+   Hi {{1}}, good news! {{2}} is back in stock. Grab it before it sells out again: {{3}}
+   ```
+4. Submit for WhatsApp approval (via the same page — Twilio submits to
+   Meta on your behalf). Utility templates are usually approved within a
+   few hours.
+5. Once approved, copy its **Content SID** (starts with `HX...`) into:
+   ```
+   TWILIO_RESTOCK_TEMPLATE_CONTENT_SID=<the HX... SID>
+   ```
+
+### 4. How merchant onboarding works (no setup from you needed per-merchant)
+1. Merchant clicks **Connect WhatsApp** in your app's dashboard
+   (`/dashboard/whatsapp`)
+2. Your app calls `createWhatsAppSender()` (`lib/twilio.ts`), which asks
+   Twilio to register a new WhatsApp Sender under **your** Twilio account
+   and returns a Twilio-hosted onboarding URL
+3. The merchant is redirected to that URL, confirms their WhatsApp number
+   (a short, Twilio-hosted flow — no login required on their end)
+4. Twilio POSTs a status update to `/api/whatsapp/status-webhook` once the
+   number is verified and online; your app marks that shop's
+   `whatsappSenderStatus` as `"online"` and stores the connected number
+5. From then on, restock alerts for that shop send via
+   `sendWhatsAppViaTwilio()` using that shop's own number as the `From`
+
+Every shop's `twilioSenderSid` / `whatsappNumber` / `whatsappSenderStatus`
+lives in its own `Shop` row — fully multi-tenant under your single Twilio
+account.
+
+### 5. Test end-to-end
+1. Deploy with `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and
+   `TWILIO_RESTOCK_TEMPLATE_CONTENT_SID` set
+2. Go to `/dashboard/whatsapp?shop=your-dev-store.myshopify.com`
+3. Click **Connect WhatsApp**, complete the Twilio-hosted flow with a real
+   phone number you control
+4. Set **Notification channels** to "WhatsApp only" or "Email + WhatsApp"
+5. Sign up for a restock alert on a sold-out product using that phone
+   number, then mark the variant back in stock in Shopify Admin — you
+   should receive the WhatsApp message
+
+### Costs (via Twilio, India, Utility category)
+- Twilio's fee: **$0.005/message**, flat
+- Meta's fee (passed through by Twilio): **~$0.0034/message** outside a
+  customer service window, **free** if the customer messaged you first in
+  the last 24h
+- Total: roughly **$0.0084/message (~₹0.70)** in the worst case
+- Check current rates any time at https://www.twilio.com/en-us/whatsapp/pricing
+  (has a live calculator by country/category)
+- No separate per-number monthly rental was found on Twilio's WhatsApp
+  pricing page as of this writing — confirm current Sender-related fees
+  in your own Twilio Console before relying on this for margin planning

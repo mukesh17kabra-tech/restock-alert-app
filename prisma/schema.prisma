@@ -17,6 +17,28 @@ model Shop {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // WhatsApp connection via Twilio (one Twilio account, owned by you —
+  // each merchant onboards their own number through a Twilio-hosted
+  // embedded signup link, no Twilio/Meta account needed on their end).
+  twilioSenderSid       String?   // e.g. "XExxxxxxxx", identifies this merchant's registered sender
+  whatsappNumber        String?   // e.g. "+91XXXXXXXXXX", the merchant's connected WhatsApp number
+  whatsappSenderStatus  String?   // "pending" | "online" | "rejected" etc, mirrors Twilio's status
+  whatsappConnectedAt   DateTime?
+
+  // Merchant toggle: which channels the storefront popup collects/sends.
+  // "email" | "whatsapp" | "both"
+  notifyChannels String @default("email")
+
+  // Tracks the active Shopify recurring charge so Business-tier overage can
+  // be billed against it via the Usage Charge API.
+  recurringChargeId String?
+
+  // Monthly WhatsApp usage counter — reset by the billing-cycle cron.
+  // Kept simple (not per-conversation) since template messages are what
+  // this app sends, and Meta bills per-message in that category.
+  whatsappMessagesThisCycle Int      @default(0)
+  currentCycleStartedAt     DateTime @default(now())
+
   subscribers VariantSubscriber[]
   webhookLogs WebhookLog[]
 }
@@ -31,14 +53,15 @@ model VariantSubscriber {
   variantId   String    // Shopify variant GID
   productTitle String
   variantTitle String
-  email       String
+  email       String?
+  phone       String?   // E.164 format, e.g. +91XXXXXXXXXX
+  name        String?
 
   notified    Boolean   @default(false)
   notifiedAt  DateTime?
   reminderSent Boolean  @default(false)
   createdAt   DateTime  @default(now())
 
-  @@unique([shopId, variantId, email]) // no duplicate signups
   @@index([shopId, variantId])
 }
 

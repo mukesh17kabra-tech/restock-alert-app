@@ -31,6 +31,8 @@ export async function GET(req: NextRequest) {
     });
 
     for (const sub of dueForReminder) {
+      if (!sub.email) continue; // WhatsApp-only signups don't get this email reminder
+
       try {
         await sendReminderEmail({
           to: sub.email,

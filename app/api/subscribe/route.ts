@@ -3,14 +3,23 @@ import { db } from "@/lib/db";
 import { z } from "zod";
 import { PLANS, PlanKey } from "@/lib/billing";
 
-const schema = z.object({
-  shop: z.string().min(1),
-  productId: z.string().min(1),
-  variantId: z.string().min(1),
-  productTitle: z.string().min(1),
-  variantTitle: z.string().min(1),
-  email: z.string().email(),
-});
+// email and phone are both optional at the schema level — the widget only
+// asks for whichever channel(s) the merchant enabled (see notifyChannels
+// on Shop), but we still require at least one contact method below.
+const schema = z
+  .object({
+    shop: z.string().min(1),
+    productId: z.string().min(1),
+    variantId: z.string().min(1),
+    productTitle: z.string().min(1),
+    variantTitle: z.string().min(1),
+    name: z.string().optional(),
+    email: z.string().email().optional(),
+    phone: z.string().min(8).optional(), // E.164, e.g. +91XXXXXXXXXX
+  })
+  .refine((data) => data.email || data.phone, {
+    message: "Provide at least an email or a phone number",
+  });
 
 // CORS: storefronts call this from the customer's browser, so allow cross-origin.
 function withCors(res: NextResponse) {
@@ -33,7 +42,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { shop, productId, variantId, productTitle, variantTitle, email } = parsed.data;
+  const { shop, productId, variantId, productTitle, variantTitle, name, email, phone } = parsed.data;
 
   const shopRecord = await db.shop.findUnique({ where: { shopDomain: shop } });
   if (!shopRecord) {
@@ -53,20 +62,21 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  await db.variantSubscriber.upsert({
+  // Prevent exact duplicate signups (same variant + same contact method).
+  const existing = await db.variantSubscriber.findFirst({
     where: {
-      shopId_variantId_email: { shopId: shopRecord.id, variantId, email },
-    },
-    update: {},
-    create: {
       shopId: shopRecord.id,
-      productId,
       variantId,
-      productTitle,
-      variantTitle,
-      email,
+      ...(email ? { email } : {}),
+      ...(phone ? { phone } : {}),
     },
   });
+
+  if (!existing) {
+    await db.variantSubscriber.create({
+      data: { shopId: shopRecord.id, productId, variantId, productTitle, variantTitle, name, email, phone },
+    });
+  }
 
   return withCors(NextResponse.json({ success: true }));
 }

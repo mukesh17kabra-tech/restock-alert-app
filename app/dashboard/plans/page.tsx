@@ -36,18 +36,31 @@ export default async function PlansPage({
         <NavBar shop={shop} host={host} active="plans" />
 
         <section>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-5 gap-3">
             <PlanCard
               name="Free"
               price="$0/mo"
-              perks={["50 active signups"]}
+              perks={["50 active signups", "Email alerts only"]}
               current={shopRecord.plan === "free"}
             />
             <PlanCard
+              name="Starter"
+              price="$3.99/mo"
+              perks={[
+                "100 active signups",
+                "30 WhatsApp messages/mo",
+                "7-day free trial",
+              ]}
+              href={`/api/billing/upgrade?shop=${shopRecord.shopDomain}&plan=starter`}
+              ctaLabel="Upgrade to Starter"
+              current={shopRecord.plan === "starter"}
+            />
+            <PlanCard
               name="Growth"
-              price="$7.99/mo"
+              price="$8.99/mo"
               perks={[
                 "200 active signups",
+                "250 WhatsApp messages/mo",
                 "Restock reminder if unopened after 48h",
                 "7-day free trial",
               ]}
@@ -57,9 +70,10 @@ export default async function PlansPage({
             />
             <PlanCard
               name="Pro"
-              price="$19/mo"
+              price="$14.99/mo"
               perks={[
                 "Unlimited signups",
+                "500 WhatsApp messages/mo",
                 "Priority email delivery",
                 "Restock reminder if unopened after 48h",
                 "7-day free trial",
@@ -69,7 +83,26 @@ export default async function PlansPage({
               highlight
               current={shopRecord.plan === "pro"}
             />
+            <PlanCard
+              name="Business"
+              price="$24.99/mo"
+              perks={[
+                "Unlimited signups",
+                "1,000 WhatsApp messages/mo",
+                "+$5 per extra 1,000 messages",
+                "Priority email delivery",
+                "7-day free trial",
+              ]}
+              href={`/api/billing/upgrade?shop=${shopRecord.shopDomain}&plan=business`}
+              ctaLabel="Upgrade to Business"
+              current={shopRecord.plan === "business"}
+            />
           </div>
+          <p className="mt-4 text-xs text-white/40">
+            WhatsApp messages beyond a plan&apos;s monthly cap fall back to email automatically
+            on Starter/Growth/Pro — only Business tier continues sending WhatsApp past its cap,
+            billed as overage.
+          </p>
         </section>
       </div>
     </main>

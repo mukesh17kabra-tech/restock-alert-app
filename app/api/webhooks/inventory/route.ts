@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sendRestockEmail } from "@/lib/email";
+import { sendWhatsAppViaTwilio } from "@/lib/twilio";
+import { PLANS, PlanKey } from "@/lib/billing";
 import crypto from "crypto";
 
 // Verifies the request genuinely came from Shopify using the HMAC header.
@@ -50,21 +52,72 @@ export async function POST(req: NextRequest) {
     where: { shopId: shop.id, variantId: String(inventory_item_id), notified: false },
   });
 
+  const plan = PLANS[shop.plan as PlanKey] ?? PLANS.free;
+
   for (const sub of pending) {
-    try {
-      await sendRestockEmail({
-        to: sub.email,
-        productTitle: sub.productTitle,
-        variantTitle: sub.variantTitle,
-        productUrl: `https://${shopDomain}/products/${sub.productId}`,
-      });
-      await db.variantSubscriber.update({
-        where: { id: sub.id },
-        data: { notified: true, notifiedAt: new Date() },
-      });
-    } catch (err) {
-      console.error(`Failed to notify ${sub.email}:`, err);
+    const productUrl = `https://${shopDomain}/products/${sub.productId}`;
+    let whatsappSent = false;
+
+    const canSendWhatsApp =
+      sub.phone &&
+      shop.whatsappNumber &&
+      shop.whatsappSenderStatus === "online" &&
+      // Business tier has no hard ceiling here — it's billed as overage
+      // instead of being blocked. Every other tier stops at its cap and
+      // falls back to email so the customer still gets notified somehow.
+      (shop.plan === "business" || shop.whatsappMessagesThisCycle < plan.whatsappMessageCap);
+
+    if (canSendWhatsApp) {
+      try {
+        // "restock_alert" Content Template must be created + approved once
+        // in the Twilio Console (Content Editor) — see README for the
+        // exact template body and how to get its Content SID.
+        await sendWhatsAppViaTwilio({
+          accountSid: process.env.TWILIO_ACCOUNT_SID!,
+          fromWhatsAppNumber: shop.whatsappNumber!,
+          to: sub.phone!,
+          contentSid: process.env.TWILIO_RESTOCK_TEMPLATE_CONTENT_SID!,
+          contentVariables: {
+            "1": sub.name || "there",
+            "2": sub.productTitle,
+            "3": productUrl,
+          },
+        });
+        whatsappSent = true;
+        await db.shop.update({
+          where: { id: shop.id },
+          data: { whatsappMessagesThisCycle: { increment: 1 } },
+        });
+      } catch (err) {
+        console.error(`Failed to WhatsApp ${sub.phone}:`, err);
+      }
     }
+
+    // Send email whenever the subscriber gave one, OR as a fallback when
+    // they only gave a phone number but WhatsApp couldn't be sent (cap
+    // reached, not connected, or the send failed) — so nobody misses out
+    // on the notification entirely just because of a plan limit.
+    const shouldEmailAsFallback = !whatsappSent && sub.phone && !sub.email;
+    if (sub.email || shouldEmailAsFallback) {
+      const emailTarget = sub.email; // fallback still requires an email on file
+      if (emailTarget) {
+        try {
+          await sendRestockEmail({
+            to: emailTarget,
+            productTitle: sub.productTitle,
+            variantTitle: sub.variantTitle,
+            productUrl,
+          });
+        } catch (err) {
+          console.error(`Failed to email ${emailTarget}:`, err);
+        }
+      }
+    }
+
+    await db.variantSubscriber.update({
+      where: { id: sub.id },
+      data: { notified: true, notifiedAt: new Date() },
+    });
   }
 
   return NextResponse.json({ ok: true, notified: pending.length });

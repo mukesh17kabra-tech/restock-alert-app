@@ -10,7 +10,7 @@ export function NavBar({
 }: {
   shop: string;
   host?: string | null;
-  active: "dashboard" | "widget-setup" | "plans";
+  active: "dashboard" | "widget-setup" | "plans" | "whatsapp";
 }) {
   const qs = new URLSearchParams({ shop });
   if (host) qs.set("host", host);
@@ -19,6 +19,7 @@ export function NavBar({
   const items: { key: typeof active; label: string; href: string }[] = [
     { key: "dashboard", label: "Dashboard", href: `/dashboard?${query}` },
     { key: "widget-setup", label: "Widget setup", href: `/dashboard/widget-setup?${query}` },
+    { key: "whatsapp", label: "WhatsApp", href: `/dashboard/whatsapp?${query}` },
     { key: "plans", label: "Plans", href: `/dashboard/plans?${query}` },
   ];
 

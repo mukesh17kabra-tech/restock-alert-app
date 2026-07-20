@@ -35,7 +35,12 @@ export async function GET(req: NextRequest) {
 
   await db.shop.update({
     where: { shopDomain: shop },
-    data: { plan: planParam },
+    data: {
+      plan: planParam,
+      recurringChargeId: chargeId,
+      whatsappMessagesThisCycle: 0,
+      currentCycleStartedAt: new Date(),
+    },
   });
 
   return NextResponse.redirect(
