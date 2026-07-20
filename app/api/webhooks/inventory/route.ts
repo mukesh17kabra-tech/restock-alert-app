@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     const canSendWhatsApp =
       sub.phone &&
       shop.whatsappNumber &&
-      shop.whatsappSenderStatus === "online" &&
+      shop.whatsappSenderStatus === "ONLINE" &&
       // Business tier has no hard ceiling here — it's billed as overage
       // instead of being blocked. Every other tier stops at its cap and
       // falls back to email so the customer still gets notified somehow.

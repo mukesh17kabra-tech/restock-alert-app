@@ -6,32 +6,40 @@ function authHeader() {
   return "Basic " + Buffer.from(`${sid}:${token}`).toString("base64");
 }
 
-// ---- Sender onboarding ----
+// ---- Sender onboarding (two-step: create, then verify with OTP) ----
 //
-// Twilio is itself a Meta-verified WhatsApp Tech Provider. Their "Senders"
-// API lets you register a merchant's WhatsApp number under YOUR Twilio
-// account, using a Twilio-hosted embedded signup link — the merchant just
-// clicks it and confirms their number. They never create a Twilio account,
-// and (unlike raw Meta Embedded Signup) they don't need their own Meta
-// Business verification either, since Twilio's verification covers it.
-// Docs: https://www.twilio.com/docs/whatsapp/self-sign-up
+// Twilio's Senders API does NOT provide a hosted "click this link" signup
+// page — the merchant's WhatsApp number must be known upfront, Twilio then
+// sends that number an OTP (SMS or voice call) which the merchant reads off
+// their phone and enters back into your app. This is still fully self-serve
+// and needs no Twilio/Meta account on the merchant's end — just their phone
+// in hand for a few seconds.
+// Docs: https://www.twilio.com/docs/whatsapp/api/senders
 
 export async function createWhatsAppSender(params: {
-  shop: string;
-  webhookUrl: string; // where Twilio will POST status updates for this sender
+  whatsappNumber: string; // E.164, e.g. "+91XXXXXXXXXX"
+  webhookUrl: string;
+  verificationMethod?: "sms" | "voice";
 }) {
-  const { webhookUrl } = params;
+  const { whatsappNumber, webhookUrl, verificationMethod = "sms" } = params;
 
   const res = await fetch(`${TWILIO_API_BASE}/Channels/Senders`, {
     method: "POST",
     headers: {
       Authorization: authHeader(),
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/json",
     },
-    body: new URLSearchParams({
-      "Sender.configuration.embedded_signup": "true",
-      "Sender.webhook.callback_url": webhookUrl,
-      "Sender.profile.name": "Restock Alerts",
+    body: JSON.stringify({
+      sender_id: `whatsapp:${whatsappNumber}`,
+      configuration: {
+        verification_method: verificationMethod,
+      },
+      webhook: {
+        callback_url: webhookUrl,
+      },
+      profile: {
+        name: "Restock Alerts",
+      },
     }),
   });
 
@@ -39,14 +47,28 @@ export async function createWhatsAppSender(params: {
     throw new Error(`Failed to create WhatsApp sender: ${res.status} ${await res.text()}`);
   }
 
-  const data = await res.json();
-  // data.sid = sender SID (e.g. XExxxxxxxx)
-  // data.embedded_signup_setup.onboarding_url = the link to send the merchant
-  return data as {
-    sid: string;
-    status: string;
-    embedded_signup_setup?: { onboarding_url?: string };
-  };
+  return res.json() as Promise<{ sid: string; status: string; sender_id: string }>;
+}
+
+// Submits the OTP code the merchant received via SMS/call to complete
+// verification. On success, status moves toward "ONLINE".
+export async function verifyWhatsAppSender(senderSid: string, verificationCode: string) {
+  const res = await fetch(`${TWILIO_API_BASE}/Channels/Senders/${senderSid}`, {
+    method: "POST",
+    headers: {
+      Authorization: authHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      configuration: { verification_code: verificationCode },
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to verify sender: ${res.status} ${await res.text()}`);
+  }
+
+  return res.json() as Promise<{ sid: string; status: string }>;
 }
 
 export async function getSenderStatus(senderSid: string) {

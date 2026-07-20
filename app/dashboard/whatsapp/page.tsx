@@ -22,7 +22,7 @@ export default async function WhatsAppPage({
     return <div className="p-8 text-sm text-gray-500">Shop not found. Please reinstall the app.</div>;
   }
 
-  const isConnected = shopRecord.whatsappSenderStatus === "online";
+  const isConnected = shopRecord.whatsappSenderStatus === "ONLINE";
   const isPending = !!shopRecord.twilioSenderSid && !isConnected;
   const plan = PLANS[shopRecord.plan as PlanKey] ?? PLANS.free;
   const whatsappAvailableOnPlan = plan.whatsappMessageCap > 0 || shopRecord.testModeBypassCaps;

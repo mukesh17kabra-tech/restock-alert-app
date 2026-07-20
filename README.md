@@ -216,9 +216,11 @@ This uses **Twilio** as the WhatsApp provider — Twilio is itself a
 Meta-verified WhatsApp Tech Provider, so merchants who install your app
 can connect their own WhatsApp number **without creating a Twilio account,
 a Meta Business account, or going through Meta's own (often flaky)
-verification flow.** Everything happens under your one Twilio account,
-through a hosted link Twilio provides — the merchant just clicks it and
-confirms their number.
+verification flow.** Everything happens under your one Twilio account.
+The merchant just enters their WhatsApp number in your dashboard, receives
+a one-time code by SMS/call on their phone, and enters it back — done.
+(Twilio's Senders API doesn't provide a hosted "click this link" signup
+page; it's this two-step number + OTP flow instead.)
 
 ### 1. Create a Twilio account
 1. Go to https://twilio.com → sign up (free trial, no card needed to start)
@@ -235,32 +237,38 @@ TWILIO_AUTH_TOKEN=<your Auth Token>
 WhatsApp requires every template to be pre-approved once, same as with
 direct Meta — Twilio just makes the submission UI simpler.
 1. Twilio Console → **Messaging → Content Template Builder** → **Create new**
-2. Category: **Utility**
-3. Body text (use `{{1}}`, `{{2}}`, `{{3}}` placeholders — these map to
+2. Template name: lowercase + underscores only, e.g. `restock_alert`
+3. Category: **Utility**
+4. Content type: **Text**
+5. Body text (use `{{1}}`, `{{2}}`, `{{3}}` placeholders — these map to
    `contentVariables` in `lib/twilio.ts` in order: name, product, link):
    ```
    Hi {{1}}, good news! {{2}} is back in stock. Grab it before it sells out again: {{3}}
    ```
-4. Submit for WhatsApp approval (via the same page — Twilio submits to
+6. Submit for WhatsApp approval (via the same page — Twilio submits to
    Meta on your behalf). Utility templates are usually approved within a
    few hours.
-5. Once approved, copy its **Content SID** (starts with `HX...`) into:
+7. Once approved, copy its **Content SID** (starts with `HX...`) into:
    ```
    TWILIO_RESTOCK_TEMPLATE_CONTENT_SID=<the HX... SID>
    ```
 
 ### 4. How merchant onboarding works (no setup from you needed per-merchant)
-1. Merchant clicks **Connect WhatsApp** in your app's dashboard
-   (`/dashboard/whatsapp`)
-2. Your app calls `createWhatsAppSender()` (`lib/twilio.ts`), which asks
-   Twilio to register a new WhatsApp Sender under **your** Twilio account
-   and returns a Twilio-hosted onboarding URL
-3. The merchant is redirected to that URL, confirms their WhatsApp number
-   (a short, Twilio-hosted flow — no login required on their end)
-4. Twilio POSTs a status update to `/api/whatsapp/status-webhook` once the
-   number is verified and online; your app marks that shop's
-   `whatsappSenderStatus` as `"online"` and stores the connected number
-5. From then on, restock alerts for that shop send via
+1. Merchant enters their WhatsApp number in your app's dashboard
+   (`/dashboard/whatsapp`) and submits
+2. Your app calls `createWhatsAppSender()` (`lib/twilio.ts`), which
+   registers a new Sender under **your** Twilio account for that number —
+   this triggers Twilio to send a one-time verification code to the
+   merchant's phone via SMS (or voice call)
+3. The merchant reads that code off their phone and enters it into a
+   second field in your dashboard
+4. Your app calls `verifyWhatsAppSender()` with that code, completing
+   verification — Twilio moves the sender's status toward `ONLINE`
+5. Twilio also POSTs status updates to `/api/whatsapp/status-webhook` as
+   the sender's status changes; your app keeps that shop's
+   `whatsappSenderStatus` in sync and records `whatsappConnectedAt` once
+   it reaches `ONLINE`
+6. From then on, restock alerts for that shop send via
    `sendWhatsAppViaTwilio()` using that shop's own number as the `From`
 
 Every shop's `twilioSenderSid` / `whatsappNumber` / `whatsappSenderStatus`
